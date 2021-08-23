@@ -128,34 +128,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        childEventListener = new ChildEventListener() {
-            @Override
-            public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
-                messageAdapter.add(snapshot.getValue(Message.class));
-            }
 
-            @Override
-            public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
-
-            }
-
-            @Override
-            public void onChildRemoved(@NonNull DataSnapshot snapshot) {
-
-            }
-
-            @Override
-            public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
-
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-
-            }
-        };
-
-        messagesDatabaseReference.addChildEventListener(childEventListener);
 
         authStateListener = new FirebaseAuth.AuthStateListener() {
             @Override
@@ -163,9 +136,11 @@ public class MainActivity extends AppCompatActivity {
                 FirebaseUser user = firebaseAuth.getCurrentUser();
                 if(user != null){
                     // user is signed in
-                    Toast.makeText(MainActivity.this, "You're now signed in.Welcome to Public Chat", Toast.LENGTH_SHORT).show();
+//                    Toast.makeText(MainActivity.this, "You're now signed in.Welcome to Public Chat", Toast.LENGTH_SHORT).show();
+                    onSignedInInitialize(user.getDisplayName());
                 }else{
                     // user is signed out
+                    onSignedOutCleanup();
                     Intent signInIntent =
                             AuthUI.getInstance()
                                     .createSignInIntentBuilder()
@@ -185,6 +160,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(resultCode == RESULT_OK){
+            Toast.makeText(MainActivity.this, "Signed In!", Toast.LENGTH_SHORT).show();
+        }else if(resultCode == RESULT_CANCELED){
+            Toast.makeText(MainActivity.this, "Sign in Canceled!", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.main_menu, menu);
@@ -193,7 +179,13 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        return super.onOptionsItemSelected(item);
+        switch (item.getItemId()){
+            case R.id.sign_out_menu:
+                AuthUI.getInstance().signOut(this);
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 
     @Override
@@ -206,5 +198,60 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         firebaseAuth.removeAuthStateListener(authStateListener);
+        detachedDatabaseReadListener();
+        messageAdapter.clear();
     }
+
+    private void onSignedInInitialize(String mUserName){
+        userName = mUserName;
+        attachDatabaseReadListener();
+    }
+
+    private void onSignedOutCleanup(){
+        userName = ANONYMOUS;
+        messageAdapter.clear();
+
+    }
+
+    private void attachDatabaseReadListener(){
+        if (childEventListener == null) {
+            childEventListener = new ChildEventListener() {
+                @Override
+                public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                    messageAdapter.add(snapshot.getValue(Message.class));
+                }
+
+                @Override
+                public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+
+                }
+
+                @Override
+                public void onChildRemoved(@NonNull DataSnapshot snapshot) {
+
+                }
+
+                @Override
+                public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+
+                }
+            };
+
+            messagesDatabaseReference.addChildEventListener(childEventListener);
+        }
+    }
+
+    private void detachedDatabaseReadListener(){
+        if(childEventListener != null) {
+            messagesDatabaseReference.removeEventListener(childEventListener);
+            childEventListener = null;
+        }
+    }
+
+
 }
